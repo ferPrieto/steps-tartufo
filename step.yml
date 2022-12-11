@@ -1,0 +1,69 @@
+title: Detect vulnerabilities in a project with Tartufo
+summary:  It checks a directory and generates a log file with the vulnerabilities found.
+description: |-
+  It checks a directory and generates a log file with the vulnerabilities found.
+
+  This Step is based on [Tartufo](https://github.com/godaddy/tartufo)
+website: https://github.com/ferPrieto/steps-tartufo
+source_code_url: https://github.com/ferPrieto/steps-tartufo
+support_url: https://github.com/ferPrieto/steps-tartufo/issues
+published_at: 2022-12-11T20:20:20.844179195Z
+host_os_tags:
+  - osx-10.10
+  - ubuntu-16.04
+
+project_type_tags:
+  - android
+  - xamarin
+  - react-native
+  - flutter
+  - cordova
+  - ionic 
+
+type_tags:
+  - scan
+
+is_requires_admin_user: true
+is_always_run: true
+is_skippable: true
+run_if: ""
+
+deps:
+  brew:
+  - name: jq
+  apt_get:
+  - name: jq
+  curl:
+  - name: jq
+
+toolkit:
+  bash:
+    entry_file: step.sh
+
+
+inputs:
+  - tartufo_toml_path: 
+    opts:
+      category: Config
+      title: Tartufo.toml path
+      description: External Rules File
+      is_expand: true
+      is_required: true
+
+  - entropy_sesitivity: 100
+    opts:
+      category: Config
+      title: File name
+      description: This option adjusts sensitivity for both encodings (b65/hex) consistently, using a scale of 0-100. 
+      is_expand: true
+      is_required: true
+
+  - show_debug_logs: "no"
+    opts:
+      category: Debug
+      title: "Show debug logs?"
+      description: |
+        If debug=yes the step will print debug infos
+      value_options:
+        - "no"
+        - "yes"

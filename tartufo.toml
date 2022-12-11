@@ -1,0 +1,6 @@
+[tool.tartufo]
+exclude-path-patterns = [{path-pattern='app/google-services\.json',reason='reason for exclusion'}]
+exclude-signatures = [{signature='e0f5aadc94cbafef0e4db52bd1c0d32a4f3c66017134ef177cbb8bfbb89447d3', reason='The reason of excluding the signature'}]
+#exclude-entropy-patterns = ['.*\.kt$:com/archives/[A-Z0-9]+/p[0-9]+']
+repo-path = "."
+regex = true
