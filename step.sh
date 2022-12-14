@@ -27,7 +27,7 @@ function checkLogsFile()
 }
 
 
-tartufo --quiet --entropy-sensitivity 100 --config ${tartufo_rules_file_path} scan-local-repo $BITRISE_SOURCE_DIR > /Users/fprieto/PersonalProjects/steps-gd-tartufo/result.txt
+tartufo --quiet --entropy-sensitivity 100 --config ${tartufo_rules_file_path} scan-local-repo $BITRISE_SOURCE_DIR > $BITRISE_SOURCE_DIR/result.txt
 
 checkLogsFile 
 
