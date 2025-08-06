@@ -206,6 +206,7 @@ inputs:
       title: Fail on Findings
       description: |
         Whether to fail the build when secrets are found.
+        Results are always saved to output files for subsequent steps.
       value_options:
         - "true"
         - "false"
@@ -237,3 +238,46 @@ inputs:
         - "true"
       is_expand: true
       is_required: true
+
+outputs:
+  - TARTUFO_FINDINGS_COUNT:
+      title: Number of Findings
+      description: |
+        The total number of potential secrets detected by the scan.
+        0 means no secrets were found.
+  
+  - TARTUFO_STATUS:
+      title: Scan Status
+      description: |
+        Overall status of the scan. Values: "CLEAN" or "SECRETS_FOUND"
+  
+  - TARTUFO_HAS_SECRETS:
+      title: Has Secrets Flag
+      description: |
+        Boolean flag indicating if secrets were found. Values: "true" or "false"
+  
+  - TARTUFO_BUILD_FAILED:
+      title: Build Failed Flag
+      description: |
+        Boolean flag indicating if the build failed due to findings. Values: "true" or "false"
+  
+  - TARTUFO_RESULTS_FILE:
+      title: Detailed Results File
+      description: |
+        Path to the detailed scan results file (text or JSON format)
+  
+  - TARTUFO_SUMMARY_FILE:
+      title: Summary File
+      description: |
+        Path to the structured summary file containing scan overview and recommendations
+  
+  - TARTUFO_DEPLOY_FILE:
+      title: Deployment File
+      description: |
+        Path to the deployment-ready summary file in $BITRISE_DEPLOY_DIR (if available)
+        This file can be used with "Deploy to Bitrise.io" step
+  
+  - TARTUFO_JSON_RESULTS_FILE:
+      title: JSON Results File
+      description: |
+        Path to the JSON-formatted results file for programmatic processing

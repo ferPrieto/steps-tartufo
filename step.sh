@@ -361,12 +361,78 @@ run_tartufo_scan() {
         fi
     fi
     
+    # Create a structured summary file for other Bitrise steps
+    local summary_file="${output_dir}/tartufo-summary.txt"
+    local deployment_file="${BITRISE_DEPLOY_DIR:-${output_dir}}/tartufo-scan-results.txt"
+    
+    # Create summary file
+    cat > "${summary_file}" << EOF
+TARTUFO SECURITY SCAN RESULTS
+============================
+Scan Date: $(date '+%Y-%m-%d %H:%M:%S')
+Target: ${target_path}
+Scan Mode: ${scan_mode}
+Entropy Sensitivity: ${entropy_sensitivity}
+Exit Code: ${exit_code}
+Findings Count: ${findings_count}
+Results File: ${output_file}
+JSON Results File: ${json_output_file}
+
+Status: $(if [ "${findings_count}" -eq 0 ]; then echo "CLEAN - No secrets detected"; else echo "SECRETS FOUND - ${findings_count} potential secrets detected"; fi)
+Build Status: $(if [ "${fail_on_findings}" == "true" ] && [ "${findings_count}" -gt 0 ]; then echo "FAILED - Build failed due to detected secrets"; else echo "PASSED - Build allowed to continue"; fi)
+
+Configuration:
+- Regex Checks: ${regex_checks}
+- Entropy Checks: ${entropy_checks}
+- Include Paths: ${include_paths:-"(all paths)"}
+- Exclude Paths: ${exclude_paths:-"(none)"}
+- Branch: ${branch_name:-"(all branches)"}
+- Max Depth: ${max_depth:-"(unlimited)"}
+- Timeout: ${scan_timeout:-300} seconds
+
+$(if [ "${findings_count}" -gt 0 ]; then
+echo "SECURITY ALERT: This repository contains potential secrets!"
+echo "Review the detailed results in: ${output_file}"
+echo ""
+echo "Recommended Actions:"
+echo "1. Review each finding to determine if it's a real secret"
+echo "2. Remove or rotate any confirmed secrets"
+echo "3. Add false positives to baseline file if needed"
+echo "4. Consider using environment variables for configuration"
+fi)
+EOF
+
+    # Copy summary to deployment directory if available
+    if [ -n "${BITRISE_DEPLOY_DIR}" ] && [ -d "${BITRISE_DEPLOY_DIR}" ]; then
+        cp "${summary_file}" "${deployment_file}"
+        print_info "Summary file created for deployment: ${deployment_file}"
+    fi
+
     # Export results for other steps (only if envman is available)
     if command_exists envman; then
         envman add --key TARTUFO_FINDINGS_COUNT --value "${findings_count}"
         envman add --key TARTUFO_RESULTS_FILE --value "${output_file}"
+        envman add --key TARTUFO_SUMMARY_FILE --value "${summary_file}"
         if [ -f "${json_output_file}" ]; then
             envman add --key TARTUFO_JSON_RESULTS_FILE --value "${json_output_file}"
+        fi
+        if [ -f "${deployment_file}" ]; then
+            envman add --key TARTUFO_DEPLOY_FILE --value "${deployment_file}"
+        fi
+        
+        # Set build status flags for easy consumption
+        if [ "${findings_count}" -gt 0 ]; then
+            envman add --key TARTUFO_HAS_SECRETS --value "true"
+            envman add --key TARTUFO_STATUS --value "SECRETS_FOUND"
+        else
+            envman add --key TARTUFO_HAS_SECRETS --value "false"
+            envman add --key TARTUFO_STATUS --value "CLEAN"
+        fi
+        
+        if [ "${fail_on_findings}" == "true" ] && [ "${findings_count}" -gt 0 ]; then
+            envman add --key TARTUFO_BUILD_FAILED --value "true"
+        else
+            envman add --key TARTUFO_BUILD_FAILED --value "false"
         fi
     fi
     
@@ -376,6 +442,10 @@ run_tartufo_scan() {
     echo "Target: ${target_path}"
     echo "Mode: ${scan_mode}"
     echo "Findings: ${findings_count}"
+    if [ -f "${deployment_file}" ]; then
+        echo "Deployment File: ${deployment_file}"
+    fi
+    echo "Summary File: ${summary_file}"
     echo "========================================="
     
     # Fail build if configured to do so and findings were detected
