@@ -51,16 +51,16 @@ install_tartufo() {
     fi
     
     # Check if pip is available
-    if ! command_exists pip3; then
-        print_error "pip3 is required but not installed"
+    if ! command_exists pip; then
+        print_error "pip is required but not installed"
         exit 1
     fi
     
     # Install tartufo
     if [ "${show_debug_logs}" == "true" ]; then
-        pip3 install tartufo
+        pip install tartufo
     else
-        pip3 install tartufo >/dev/null 2>&1
+        pip install tartufo >/dev/null 2>&1
     fi
     
     if command_exists tartufo; then
