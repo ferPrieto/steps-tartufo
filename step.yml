@@ -92,14 +92,15 @@ inputs:
       is_expand: true
       is_required: false
 
-  - entropy_sensitivity: "75"
+  - entropy_sensitivity: "90"
     opts:
       category: Detection Settings
       title: Entropy Sensitivity
       description: |
         Adjusts sensitivity for entropy-based detection (0-100).
         Higher values are more sensitive and may produce more false positives.
-        Default is 75 for balanced detection.
+        Default is 90 for conservative detection that avoids massive output files.
+        Use 75-85 for more sensitive detection, but beware of large outputs.
       is_expand: true
       is_required: true
 
@@ -137,13 +138,14 @@ inputs:
       is_expand: true
       is_required: false
 
-  - exclude_paths:
+  - exclude_paths: ".git/,node_modules/,build/,dist/,*.log"
     opts:
       category: Path Filtering
       title: Exclude Paths
       description: |
         Comma-separated list of paths to exclude from the scan.
-        Example: "node_modules/,*.log,build/"
+        Default excludes common large directories that rarely contain secrets.
+        Example: "node_modules/,*.log,build/,vendor/"
       is_expand: true
       is_required: false
 
