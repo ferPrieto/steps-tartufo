@@ -5,7 +5,7 @@ set -e
 
 # Debug logging
 if [ "${show_debug_logs}" == "true" ]; then
-    set -x
+  set -x
     echo "Debug mode enabled"
 fi
 
@@ -53,7 +53,7 @@ install_tartufo() {
     # Check if pip is available
     if ! command_exists pip; then
         print_error "pip is required but not installed"
-        exit 1
+            exit 1
     fi
     
     # Install tartufo
@@ -71,7 +71,7 @@ install_tartufo() {
     else
         print_error "Failed to install Tartufo"
         exit 1
-    fi
+    fi 
 }
 
 # Function to build tartufo command
@@ -200,16 +200,56 @@ run_tartufo_scan() {
     # File size limits (in bytes)
     local max_file_size=$((30 * 1024 * 1024))  # 30MB
     local warning_file_size=$((20 * 1024 * 1024))  # 20MB
+    local emergency_file_size=$((100 * 1024 * 1024))  # 100MB - kill scan if exceeded
     
     # Scan timeout (default to 300 seconds if not set)
     local timeout_seconds="${scan_timeout:-300}"
     
+    # Warn about potentially problematic entropy settings
+    local entropy_val="${entropy_sensitivity:-90}"
+    if [ "${entropy_val}" -lt 85 ]; then
+        print_warning "Entropy sensitivity is set to ${entropy_val}. Values below 85 may generate very large output files."
+        print_warning "Consider using path exclusions or increasing entropy sensitivity if scan generates large files."
+    fi
+    
+    # Function to monitor file size during scan
+    monitor_file_size() {
+        local file_to_monitor="$1"
+        local max_size="$2"
+        local scan_pid="$3"
+        
+        while kill -0 "$scan_pid" 2>/dev/null; do
+            if [ -f "$file_to_monitor" ]; then
+                local current_size=$(stat -f%z "$file_to_monitor" 2>/dev/null || wc -c < "$file_to_monitor" 2>/dev/null || echo "0")
+                if [ "$current_size" -gt "$max_size" ]; then
+                    print_error "Output file exceeded ${max_size} bytes (currently ${current_size}). Terminating scan to prevent system overload."
+                    kill -TERM "$scan_pid" 2>/dev/null
+                    sleep 2
+                    kill -KILL "$scan_pid" 2>/dev/null
+                    return 1
+                fi
+            fi
+            sleep 2
+        done
+        return 0
+    }
+    
     # Always capture text output for logging with size monitoring
     if [ "${scan_mode}" == "path" ]; then
         # scan-folder might prompt for confirmation if it's a git repo
-        echo "y" | timeout "${timeout_seconds}" bash -c "${cmd}" > "${output_file}" 2>&1 || exit_code=$?
+        echo "y" | timeout "${timeout_seconds}" bash -c "${cmd}" > "${output_file}" 2>&1 &
+        local scan_pid=$!
+        monitor_file_size "${output_file}" "${emergency_file_size}" "${scan_pid}" &
+        local monitor_pid=$!
+        wait "${scan_pid}" || exit_code=$?
+        kill "${monitor_pid}" 2>/dev/null || true
     else
-        timeout "${timeout_seconds}" bash -c "${cmd}" > "${output_file}" 2>&1 || exit_code=$?
+        timeout "${timeout_seconds}" bash -c "${cmd}" > "${output_file}" 2>&1 &
+        local scan_pid=$!
+        monitor_file_size "${output_file}" "${emergency_file_size}" "${scan_pid}" &
+        local monitor_pid=$!
+        wait "${scan_pid}" || exit_code=$?
+        kill "${monitor_pid}" 2>/dev/null || true
     fi
     
     # Check file size and truncate if necessary
@@ -217,12 +257,18 @@ run_tartufo_scan() {
         local file_size=$(stat -f%z "${output_file}" 2>/dev/null || wc -c < "${output_file}")
         if [ "${file_size}" -gt "${max_file_size}" ]; then
             print_warning "Output file is too large (${file_size} bytes). Truncating to ${max_file_size} bytes."
+            print_warning "RECOMMENDATIONS to reduce file size:"
+            print_warning "  1. Increase entropy_sensitivity to 95 or higher"
+            print_warning "  2. Add exclude_paths for large directories (node_modules/, .git/, build/)"
+            print_warning "  3. Use scan-local-repo instead of scan-folder for git repositories"
+            print_warning "  4. Set max_depth to limit commit history scanning"
             # Keep the first part of the file and add truncation notice
             head -c $((max_file_size - 1000)) "${output_file}" > "${output_file}.tmp"
             echo -e "\n\n[TRUNCATED] Output was too large and has been truncated. Original size: ${file_size} bytes" >> "${output_file}.tmp"
+            echo -e "RECOMMENDATIONS: Increase entropy_sensitivity to 95+, add exclude_paths, or use scan-local-repo mode" >> "${output_file}.tmp"
             mv "${output_file}.tmp" "${output_file}"
         elif [ "${file_size}" -gt "${warning_file_size}" ]; then
-            print_warning "Output file is large (${file_size} bytes). Consider adjusting entropy sensitivity or using path exclusions."
+            print_warning "Output file is large (${file_size} bytes). Consider increasing entropy_sensitivity to 90+ or using path exclusions."
         fi
     fi
     
@@ -247,9 +293,12 @@ run_tartufo_scan() {
         cp "${output_file}" "${json_output_file}"
     fi
     
-    # Handle timeout exit code
+    # Handle timeout and termination exit codes
     if [ "${exit_code}" -eq 124 ]; then
         print_error "Tartufo scan timed out after ${timeout_seconds} seconds. Consider using path exclusions, reducing entropy sensitivity, or increasing scan_timeout."
+        exit_code=1
+    elif [ "${exit_code}" -eq 143 ] || [ "${exit_code}" -eq 137 ]; then
+        print_error "Tartufo scan was terminated (likely due to large output file). Consider increasing entropy sensitivity or using path exclusions."
         exit_code=1
     fi
     
